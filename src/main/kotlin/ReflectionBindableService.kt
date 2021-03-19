@@ -14,6 +14,9 @@ import kotlin.reflect.full.*
 
 /**
  * A bindable service that uses reflection.
+ *
+ * The ReflectionBindableService analyses a wire generated service
+ * and exposes it as a GRPC ServerServiceDefinition
  */
 class ReflectionBindableService<T : Service>(
     val service: T,
@@ -39,23 +42,23 @@ class ReflectionBindableService<T : Service>(
         }
     }
 
-    private fun isUnary(method: KFunction<*>) : Boolean {
+    private fun isUnary(method: KFunction<*>): Boolean {
         return method.parameters.size == 2
                 && method.parameters[1].type.classifier != ReceiveChannel::class
     }
 
-    private fun isClientStream(method: KFunction<*>) : Boolean {
+    private fun isClientStream(method: KFunction<*>): Boolean {
         return method.parameters.size == 2
                 && method.parameters[1].type.classifier == ReceiveChannel::class
     }
 
-    private fun isServerStream(method: KFunction<*>) : Boolean {
+    private fun isServerStream(method: KFunction<*>): Boolean {
         return method.parameters.size == 3
                 && method.parameters[1].type.classifier != ReceiveChannel::class
                 && method.parameters[2].type.classifier == SendChannel::class
     }
 
-    private fun isBiDiStream(method: KFunction<*>) : Boolean {
+    private fun isBiDiStream(method: KFunction<*>): Boolean {
         return method.parameters.size == 3
                 && method.parameters[1].type.classifier == ReceiveChannel::class
                 && method.parameters[2].type.classifier == SendChannel::class
