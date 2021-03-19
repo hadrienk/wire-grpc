@@ -7,6 +7,7 @@ import io.grpc.MethodDescriptor
 import io.grpc.ServerServiceDefinition
 import io.grpc.stub.ServerCalls
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.SendChannel
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.*
@@ -29,13 +30,35 @@ class ReflectionBindableService<T : Service>(
     }
 
     private fun guessType(method: KFunction<*>): MethodDescriptor.MethodType {
-        return when (method.name) {
-            "Unary" -> MethodDescriptor.MethodType.UNARY
-            "Outbound" -> MethodDescriptor.MethodType.SERVER_STREAMING
-            "Inbound" -> MethodDescriptor.MethodType.CLIENT_STREAMING
-            "InboundOutbound" -> MethodDescriptor.MethodType.BIDI_STREAMING
+        return when {
+            isUnary(method) -> MethodDescriptor.MethodType.UNARY
+            isServerStream(method) -> MethodDescriptor.MethodType.SERVER_STREAMING
+            isClientStream(method) -> MethodDescriptor.MethodType.CLIENT_STREAMING
+            isBiDiStream(method) -> MethodDescriptor.MethodType.BIDI_STREAMING
             else -> MethodDescriptor.MethodType.UNKNOWN
         }
+    }
+
+    private fun isUnary(method: KFunction<*>) : Boolean {
+        return method.parameters.size == 2
+                && method.parameters[1].type.classifier != ReceiveChannel::class
+    }
+
+    private fun isClientStream(method: KFunction<*>) : Boolean {
+        return method.parameters.size == 2
+                && method.parameters[1].type.classifier == ReceiveChannel::class
+    }
+
+    private fun isServerStream(method: KFunction<*>) : Boolean {
+        return method.parameters.size == 3
+                && method.parameters[1].type.classifier != ReceiveChannel::class
+                && method.parameters[2].type.classifier == SendChannel::class
+    }
+
+    private fun isBiDiStream(method: KFunction<*>) : Boolean {
+        return method.parameters.size == 3
+                && method.parameters[1].type.classifier == ReceiveChannel::class
+                && method.parameters[2].type.classifier == SendChannel::class
     }
 
     override fun bindService(): ServerServiceDefinition {
