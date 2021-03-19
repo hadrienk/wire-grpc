@@ -60,7 +60,8 @@ public class InboundAdapter<Request, Response>(
 
         GlobalScope.launch {
             try {
-                observer.onNext(method.invoke(requestChannel))
+                val response = method.invoke(requestChannel)
+                observer.onNext(response)
                 observer.onCompleted()
             } catch (e: Exception) {
                 observer.onError(e)
@@ -69,15 +70,21 @@ public class InboundAdapter<Request, Response>(
 
         return object : StreamObserver<Request> {
             override fun onNext(value: Request) {
-                requestChannel.offer(value)
+                GlobalScope.launch {
+                    requestChannel.send(value)
+                }
             }
 
             override fun onError(t: Throwable?) {
-                requestChannel.close(t)
+                GlobalScope.launch {
+                    requestChannel.close(t)
+                }
             }
 
             override fun onCompleted() {
-                requestChannel.close()
+                GlobalScope.launch {
+                    requestChannel.close()
+                }
             }
         }
     }
@@ -107,15 +114,21 @@ public class InboundOutboundAdapter<Request, Response>(
 
         return object : StreamObserver<Request> {
             override fun onNext(value: Request) {
-                requestChannel.offer(value)
+                GlobalScope.launch {
+                        requestChannel.send(value)
+                }
             }
 
             override fun onError(t: Throwable?) {
-                requestChannel.close(t)
+                GlobalScope.launch {
+                    requestChannel.close(t)
+                }
             }
 
             override fun onCompleted() {
-                requestChannel.close()
+                GlobalScope.launch {
+                    requestChannel.close()
+                }
             }
         }
     }
