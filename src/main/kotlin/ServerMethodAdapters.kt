@@ -1,4 +1,3 @@
-import com.squareup.wire.Message
 import io.grpc.stub.ServerCalls
 import io.grpc.stub.StreamObserver
 import kotlinx.coroutines.GlobalScope
@@ -11,10 +10,6 @@ typealias WireUnaryMethod<Request, Response> = suspend (req: Request) -> Respons
 typealias WireOutboundMethod<Request, Response> = suspend (req: Request, resp: SendChannel<Response>) -> Unit
 typealias WireInboundMethod<Request, Response> = suspend (req: ReceiveChannel<Request>) -> Response
 typealias WireInboundOutboundMethod<Request, Response> = suspend (req: ReceiveChannel<Request>, resp: SendChannel<Response>) -> Unit
-
-//typealias WireOutboundMethod<Request, Response> = KSuspendFunction1<ReceiveChannel<Request>, Response>
-//typealias WireInboundOutboundMethod<Request, Response> = KSuspendFunction2<ReceiveChannel<Request>, SendChannel<Response>, Unit>
-//typealias WireInboundMethod<Request, Response> = KSuspendFunction2<Request, SendChannel<Response>, Unit>
 
 public class UnaryAdapter<Request, Response>(
     private val method: WireUnaryMethod<Request, Response>
