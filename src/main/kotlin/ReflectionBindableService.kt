@@ -4,6 +4,7 @@ import com.squareup.wire.Service
 import com.squareup.wire.WireRpc
 import io.grpc.BindableService
 import io.grpc.MethodDescriptor
+import io.grpc.ServerCallHandler
 import io.grpc.ServerServiceDefinition
 import io.grpc.stub.ServerCalls
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -19,8 +20,8 @@ import kotlin.reflect.full.*
  * and exposes it as a GRPC ServerServiceDefinition
  */
 class ReflectionBindableService<T : Service>(
-    val service: T,
-    val kClass: KClass<out T>
+    private val service: T,
+    private val kClass: KClass<out T>,
 ) : BindableService {
 
     constructor(service: T) : this(service, service::class)
@@ -98,57 +99,37 @@ class ReflectionBindableService<T : Service>(
                 .setRequestMarshaller(requestMarshaller)
                 .setResponseMarshaller(responseMarshaller)
                 .build()
-
-            when (methodType) {
-                MethodDescriptor.MethodType.UNARY -> {
-                    val unary: WireUnaryMethod<Message<*, *>, Message<*, *>> =
-                        { input: Any -> method.callSuspend(service, input) as Message<*, *> }
-                    val unaryAdapter: ServerCalls.UnaryMethod<Message<*, *>, Message<*, *>> = UnaryAdapter(unary)
-                    val handler = ServerCalls.asyncUnaryCall(unaryAdapter)
-                    builder.addMethod(
-                        methodDescriptor,
-                        handler
-                    )
-                }
-                MethodDescriptor.MethodType.CLIENT_STREAMING -> {
-                    val clientStream: WireInboundMethod<Message<*, *>, Message<*, *>> =
-                        { req: ReceiveChannel<*> -> method.callSuspend(service, req) as Message<*, *> }
-                    val clientAdapter: ServerCalls.ClientStreamingMethod<Message<*, *>, Message<*, *>> =
-                        InboundAdapter(clientStream)
-                    val handler = ServerCalls.asyncClientStreamingCall(clientAdapter)
-                    builder.addMethod(
-                        methodDescriptor,
-                        handler
-                    )
-                }
-                MethodDescriptor.MethodType.SERVER_STREAMING -> {
-                    var serverStream: WireOutboundMethod<Message<*, *>, Message<*, *>> =
-                        { any, resp -> method.callSuspend(service, any, resp) }
-                    val serverAdapter: ServerCalls.ServerStreamingMethod<Message<*, *>, Message<*, *>> =
-                        OutboundAdapter(serverStream)
-                    val handler = ServerCalls.asyncServerStreamingCall(serverAdapter)
-                    builder.addMethod(
-                        methodDescriptor,
-                        handler
-                    )
-
-                }
-                MethodDescriptor.MethodType.BIDI_STREAMING -> {
-                    val biStream: WireInboundOutboundMethod<Message<*, *>, Message<*, *>> =
-                        { req, resp -> method.callSuspend(service, req, resp) }
-                    val biAdapter: ServerCalls.BidiStreamingMethod<Message<*, *>, Message<*, *>> =
-                        InboundOutboundAdapter(biStream)
-                    val handler = ServerCalls.asyncBidiStreamingCall(biAdapter)
-                    builder.addMethod(
-                        methodDescriptor,
-                        handler
-                    )
-                }
-                MethodDescriptor.MethodType.UNKNOWN -> {
-                    throw IllegalStateException("unknow method type for ${method.name}")
-                }
-            }
+            builder.addMethod(methodDescriptor, createHandler(methodType, method))
         }
         return builder.build()
+    }
+
+    private fun createHandler(
+        methodType: MethodDescriptor.MethodType,
+        method: KFunction<*>,
+    ): ServerCallHandler<Message<*, *>, Message<*, *>> {
+        return when (methodType) {
+            MethodDescriptor.MethodType.UNARY -> ServerCalls.asyncUnaryCall(UnaryAdapter { input: Any ->
+                method.callSuspend(service,
+                    input) as Message<*, *>
+            })
+            MethodDescriptor.MethodType.CLIENT_STREAMING -> ServerCalls.asyncClientStreamingCall(ClientStreamAdapter { req: ReceiveChannel<*> ->
+                method.callSuspend(service,
+                    req) as Message<*, *>
+            })
+            MethodDescriptor.MethodType.SERVER_STREAMING -> ServerCalls.asyncServerStreamingCall(ServerStreamAdapter { any, resp ->
+                method.callSuspend(service,
+                    any,
+                    resp)
+            })
+            MethodDescriptor.MethodType.BIDI_STREAMING -> ServerCalls.asyncBidiStreamingCall(BiDiStreamAdapter { req, resp ->
+                method.callSuspend(service,
+                    req,
+                    resp)
+            })
+            MethodDescriptor.MethodType.UNKNOWN -> {
+                throw IllegalStateException("unknown method type for ${method.name}")
+            }
+        }
     }
 }

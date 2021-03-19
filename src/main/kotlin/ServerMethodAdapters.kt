@@ -7,9 +7,9 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.launch
 
 typealias WireUnaryMethod<Request, Response> = suspend (req: Request) -> Response
-typealias WireOutboundMethod<Request, Response> = suspend (req: Request, resp: SendChannel<Response>) -> Unit
-typealias WireInboundMethod<Request, Response> = suspend (req: ReceiveChannel<Request>) -> Response
-typealias WireInboundOutboundMethod<Request, Response> = suspend (req: ReceiveChannel<Request>, resp: SendChannel<Response>) -> Unit
+typealias WireServerStreamMethod<Request, Response> = suspend (req: Request, resp: SendChannel<Response>) -> Unit
+typealias WireClientStreamMethod<Request, Response> = suspend (req: ReceiveChannel<Request>) -> Response
+typealias WireBiStreamMethod<Request, Response> = suspend (req: ReceiveChannel<Request>, resp: SendChannel<Response>) -> Unit
 
 public class UnaryAdapter<Request, Response>(
     private val method: WireUnaryMethod<Request, Response>
@@ -28,8 +28,8 @@ public class UnaryAdapter<Request, Response>(
 }
 
 
-public class OutboundAdapter<Request, Response>(
-    private val method: WireOutboundMethod<Request, Response>
+public class ServerStreamAdapter<Request, Response>(
+    private val method: WireServerStreamMethod<Request, Response>
 ) : ServerCalls.ServerStreamingMethod<Request, Response> {
     override fun invoke(request: Request, response: StreamObserver<Response>?) {
         // TODO: Improve.
@@ -50,8 +50,8 @@ public class OutboundAdapter<Request, Response>(
     }
 }
 
-public class InboundAdapter<Request, Response>(
-    private val method: WireInboundMethod<Request, Response>
+public class ClientStreamAdapter<Request, Response>(
+    private val method: WireClientStreamMethod<Request, Response>
 ) : ServerCalls.ClientStreamingMethod<Request, Response> {
     override fun invoke(responseObserver: StreamObserver<Response>?): StreamObserver<Request> {
 
@@ -91,8 +91,8 @@ public class InboundAdapter<Request, Response>(
 
 }
 
-public class InboundOutboundAdapter<Request, Response>(
-    private val method: WireInboundOutboundMethod<Request, Response>
+public class BiDiStreamAdapter<Request, Response>(
+    private val method: WireBiStreamMethod<Request, Response>
 ) : ServerCalls.BidiStreamingMethod<Request, Response> {
     override fun invoke(responseObserver: StreamObserver<Response>?): StreamObserver<Request> {
         val requestChannel = Channel<Request>()
