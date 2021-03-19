@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package io.hadrien.wire;
+
+option java_package = "io.hadrien.wire";
+
+message Input {
+    string content = 1;
+}
+
+message Output {
+    string content = 1;
+}
+
+service TestGrpcService {
+    rpc Unary (Input) returns (Output);
+    rpc Outbound (Input) returns (stream Output);
+    rpc Inbound (stream Input) returns (Output);
+    rpc InboundOutbound (stream Input) returns (stream Output);
+}
