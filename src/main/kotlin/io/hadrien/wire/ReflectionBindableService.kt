@@ -1,3 +1,5 @@
+package io.hadrien.wire
+
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 import com.squareup.wire.Service
@@ -16,7 +18,7 @@ import kotlin.reflect.full.*
 /**
  * A bindable service that uses reflection.
  *
- * The ReflectionBindableService analyses a wire generated service
+ * The io.hadrien.wire.ReflectionBindableService analyses a wire generated service
  * and exposes it as a GRPC ServerServiceDefinition
  */
 class ReflectionBindableService<T : Service>(

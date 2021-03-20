@@ -1,3 +1,6 @@
+package io.hadrien.wire
+
+import io.grpc.Status
 import io.grpc.stub.ServerCalls
 import io.grpc.stub.StreamObserver
 import kotlinx.coroutines.GlobalScope
@@ -5,6 +8,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 typealias WireUnaryMethod<Request, Response> = suspend (req: Request) -> Response
 typealias WireServerStreamMethod<Request, Response> = suspend (req: Request, resp: SendChannel<Response>) -> Unit
@@ -12,52 +16,49 @@ typealias WireClientStreamMethod<Request, Response> = suspend (req: ReceiveChann
 typealias WireBiStreamMethod<Request, Response> = suspend (req: ReceiveChannel<Request>, resp: SendChannel<Response>) -> Unit
 
 public class UnaryAdapter<Request, Response>(
-    private val method: WireUnaryMethod<Request, Response>
+    private val method: WireUnaryMethod<Request, Response>,
 ) : ServerCalls.UnaryMethod<Request, Response> {
     override fun invoke(request: Request, responseObserver: StreamObserver<Response>?) {
         val observer = responseObserver!!
-        try {
-            GlobalScope.launch {
+        GlobalScope.launch {
+            try {
                 observer.onNext(method.invoke(request))
                 observer.onCompleted()
+            } catch (e: Exception) {
+                observer.onError(Status.fromThrowable(e).asException())
             }
-        } catch (e: Exception) {
-            observer.onError(e)
         }
     }
 }
 
-
 public class ServerStreamAdapter<Request, Response>(
-    private val method: WireServerStreamMethod<Request, Response>
+    private val method: WireServerStreamMethod<Request, Response>,
 ) : ServerCalls.ServerStreamingMethod<Request, Response> {
-    override fun invoke(request: Request, response: StreamObserver<Response>?) {
-        // TODO: Improve.
+    override fun invoke(request: Request, responseObserver: StreamObserver<Response>?) {
         val responseChannel = Channel<Response>()
-        try {
-            GlobalScope.launch {
-                method.invoke(request!!, responseChannel)
-            }
-            GlobalScope.launch {
-                for (value in responseChannel) {
-                    response!!.onNext(value)
+        val observer = responseObserver!!
+        GlobalScope.launch {
+            try {
+                launch {
+                    method.invoke(request, responseChannel)
                 }
-                response!!.onCompleted()
+                for (value in responseChannel) {
+                    observer.onNext(value)
+                }
+                observer.onCompleted()
+            } catch (ex: Exception) {
+                observer.onError(Status.fromThrowable(ex).asException())
             }
-        } catch (e: Exception) {
-            response!!.onError(e)
         }
     }
 }
 
 public class ClientStreamAdapter<Request, Response>(
-    private val method: WireClientStreamMethod<Request, Response>
+    private val method: WireClientStreamMethod<Request, Response>,
 ) : ServerCalls.ClientStreamingMethod<Request, Response> {
     override fun invoke(responseObserver: StreamObserver<Response>?): StreamObserver<Request> {
-
-        val observer = responseObserver!!
         val requestChannel = Channel<Request>()
-
+        val observer = responseObserver!!
         GlobalScope.launch {
             try {
                 val response = method.invoke(requestChannel)
@@ -68,21 +69,22 @@ public class ClientStreamAdapter<Request, Response>(
             }
         }
 
+        // TODO: Link the coroutines so cancellation and clean up is handled.
         return object : StreamObserver<Request> {
             override fun onNext(value: Request) {
-                GlobalScope.launch {
+                runBlocking {
                     requestChannel.send(value)
                 }
             }
 
             override fun onError(t: Throwable?) {
-                GlobalScope.launch {
+                runBlocking {
                     requestChannel.close(t)
                 }
             }
 
             override fun onCompleted() {
-                GlobalScope.launch {
+                runBlocking {
                     requestChannel.close()
                 }
             }
@@ -92,41 +94,42 @@ public class ClientStreamAdapter<Request, Response>(
 }
 
 public class BiDiStreamAdapter<Request, Response>(
-    private val method: WireBiStreamMethod<Request, Response>
+    private val method: WireBiStreamMethod<Request, Response>,
 ) : ServerCalls.BidiStreamingMethod<Request, Response> {
     override fun invoke(responseObserver: StreamObserver<Response>?): StreamObserver<Request> {
         val requestChannel = Channel<Request>()
         val responseChannel = Channel<Response>()
-        try {
-            GlobalScope.launch {
-                method.invoke(requestChannel, responseChannel)
-            }
-
-            GlobalScope.launch {
-                for (value in responseChannel) {
-                    responseObserver!!.onNext(value)
+        val observer = responseObserver!!
+        GlobalScope.launch {
+            try {
+                launch {
+                    method.invoke(requestChannel, responseChannel)
                 }
-                responseObserver!!.onCompleted()
+                for (value in responseChannel) {
+                    observer.onNext(value)
+                }
+                observer.onCompleted()
+            } catch (e: Exception) {
+                observer.onError(Status.fromThrowable(e).asException())
             }
-        } catch (e: Exception) {
-            responseObserver!!.onError(e)
         }
 
+        // TODO: Link the coroutines so cancellation and clean up is handled.
         return object : StreamObserver<Request> {
             override fun onNext(value: Request) {
-                GlobalScope.launch {
-                        requestChannel.send(value)
+                runBlocking {
+                    requestChannel.send(value)
                 }
             }
 
             override fun onError(t: Throwable?) {
-                GlobalScope.launch {
+                runBlocking {
                     requestChannel.close(t)
                 }
             }
 
             override fun onCompleted() {
-                GlobalScope.launch {
+                runBlocking {
                     requestChannel.close()
                 }
             }

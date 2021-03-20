@@ -1,10 +1,8 @@
+package io.hadrien.wire
+
 import com.squareup.wire.GrpcClient
 import io.grpc.Server
 import io.grpc.ServerBuilder
-import io.hadrien.wire.Input
-import io.hadrien.wire.Output
-import io.hadrien.wire.TestGrpcServiceClient
-import io.hadrien.wire.TestGrpcServiceServer
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
 import okhttp3.OkHttpClient

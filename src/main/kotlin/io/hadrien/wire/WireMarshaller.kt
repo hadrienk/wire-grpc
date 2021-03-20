@@ -1,3 +1,5 @@
+package io.hadrien.wire
+
 import com.squareup.wire.ProtoAdapter
 import io.grpc.MethodDescriptor
 import java.io.InputStream
