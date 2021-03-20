@@ -2,8 +2,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "1.4.30"
-    application
     id("com.squareup.wire") version "3.6.1"
+    id("com.github.hierynomus.license") version "0.15.0"
 }
 
 group = "io.hadrien"
@@ -47,8 +47,10 @@ wire {
     //}
 }
 
-tasks.withType<com.squareup.wire.gradle.WireTask>() {
-    println(this)
+license {
+    val headerFile = project.file("HEADER.txt")
+    header = headerFile
+    strictCheck = true
 }
 
 tasks.test {
@@ -57,8 +59,4 @@ tasks.test {
 
 tasks.withType<KotlinCompile>() {
     kotlinOptions.jvmTarget = "11"
-}
-
-application {
-    mainClassName = "ServerKt"
 }
